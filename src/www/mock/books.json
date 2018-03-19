@@ -1,0 +1,6 @@
+[
+  {"name": "C#", "author": "Frank", "price": "23"},
+  {"name": "Java", "author": "Jack", "price": "22"},
+  {"name": "C++", "author": "John", "price": "22"},
+  {"name": "python", "author": "Jordan", "price": "20"}
+]

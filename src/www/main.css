@@ -1,0 +1,19 @@
+.echartsBox {
+    position: relative;
+    box-sizing: border-box;
+    border-radius: 5px;
+    height: 300px;
+    width: 100%;
+    background-color: #e5e5e5;
+    background-repeat: repeat-x;
+    background-size: contain;
+    background-image: url("./images/beijing.png");
+}
+.personInfo{
+    padding-bottom: 20px;
+}
+
+.bold{
+    color: #000;
+    font-weight: 600;
+}
