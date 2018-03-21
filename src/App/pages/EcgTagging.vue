@@ -31,7 +31,37 @@
         </el-card>
         <div class="bg-right">
             <el-card>
+                <el-select v-model="newLabel" placeholder="添加标注">
+                    <el-option
+                            v-for="item in tagLabels"
+                            :key="item"
+                            :label="item"
+                            :value="item">
+                    </el-option>
+                </el-select>
+                <el-button type="primary" size="small" style="width: 100%;margin-top: 5px;" @click="upDateLabel">确定
+                </el-button>
+            </el-card>
 
+            <el-card class="addLabelLine">
+                <p class="rythemTitle">标注线</p>
+                <el-button type="primary" size="small" style="width: 100%;margin-top: 5px;" @click="addLine">添加标注线
+                </el-button>
+                <br>
+                <el-button type="warning" size="small" style="width: 100%;margin-top: 5px;" @click="deleteTag">
+                    移除标注线
+                </el-button>
+            </el-card>
+
+            <el-card class="addLabelLine">
+                <p class="rythemTitle">添加节律<span class="rythemTxt"></span></p>
+                <el-button type="primary" size="small" style="width: 100%;margin-top: 5px;" @click="addRhythmStart">
+                    设置开始始节拍
+                </el-button>
+                <br>
+                <el-button type="warning" size="small" style="width: 100%;margin-top: 5px;" @click="rhythmFinished">
+                    设置结束节拍
+                </el-button>
             </el-card>
         </div>
     </div>
@@ -44,6 +74,7 @@
     import {tagData} from '../entity/tagData';
     import {tagDataLine} from '../entity/tagDataLine';
     import * as echarts from "echarts";
+    import Constants from '../../Constants';
 
     declare let $: any;
     @Component({})
@@ -61,13 +92,93 @@
         updateState: boolean = false;//tag的编辑状态
         currentUpdatexAxis: string = "";//编辑tag的横坐标
         addTagIndex: string = "";//新添加tag的横坐标
-        startTime:number=0;
-        endTime:number=0;//以上两个变量用于控制按键速度
-        currentRow:number=0;//当前在操作的行数
-        drawMarkLine(row?:number) {
-            if(row){
+        startTime: number = 0;
+        endTime: number = 0;//以上两个变量用于控制按键速度
+        currentRow: number = 0;//当前在操作的行数
+        tagLabels: Array<String> = ["N-正常心搏", "S-房性早搏", "V-室性早搏", "F-心室融合心跳", "Q-未分类心跳"]; //节拍描述选项
+        newLabel: string = "";
+        labelMap: Array<string> = ['N', 'S', 'V', 'F', 'Q'];
+        addState: boolean = false;
+        rhythmStartState: boolean = false;
+        rhythmEndState: boolean = false;
+        rhythmStart: string = '';
+        rhythmEnd: string = '';
+
+        resetStatus(currentRow?:number) {
+            this.updateState = false;
+            this.currentUpdatexAxis = "";
+            this.tagData = this.tagData.map(e => {
+                return {
+                    xAxis: e.xAxis,
+                    label: {
+                        formatter: e.label.formatter
+                    }
+                }
+            });
+            this.drawMarkLine(currentRow);
+        }
+
+        addRhythmStart() {
+            this.resetStatus();
+            this.rhythmStartState = true;
+        }
+
+        rhythmFinished() {
+            this.rhythmEndState = true;
+        }
+
+        deleteTag() {
+            if (this.updateState) {
+                this.tagData = this.tagData.filter((e: tagDataLine) => {
+                    return e.xAxis !== this.currentUpdatexAxis
+                });
+                this.drawMarkLine(this.currentRow);
+            }
+        }
+
+        addLine() {
+            this.addState = true;
+            this.tagData.push({
+                xAxis: this.addTagIndex,
+                label: {
+                    formatter: ''
+                }
+            });
+            this.tagData = Constants.distinct(this.tagData, e => e.xAxis);
+            let currentRow = Math.floor(Number(this.addTagIndex.split('index')[1]) / 3000);
+            this.drawMarkLine(currentRow);
+        }
+
+        upDateLabel() {
+            if (this.updateState) {
+                let currentLabelIndex = this.tagLabels.indexOf(this.newLabel);
+                this.tagData = this.tagData.map(e => {
+                    if (e.xAxis === this.currentUpdatexAxis) {
+                        return {
+                            xAxis: e.xAxis,
+                            label: {
+                                formatter: this.labelMap[currentLabelIndex]
+                            }
+                        }
+                    } else {
+                        return {
+                            xAxis: e.xAxis,
+                            label: {
+                                formatter: e.label.formatter
+                            }
+                        }
+                    }
+                });
+                this.drawMarkLine(this.currentRow);
+                this.newLabel = '';
+                this.resetStatus(this.currentRow);
+            }
+        }
+
+        drawMarkLine(row?: number) {
+            if (row) {
                 let currentTag = this.tagData.filter((e: tagDataLine) => {
-                    return Number(e.xAxis.split('index')[1])>=row*3000&&Number(e.xAxis.split('index')[1])<=row*3000+3000
+                    return Number(e.xAxis.split('index')[1]) >= row * 3000 && Number(e.xAxis.split('index')[1]) <= row * 3000 + 3000
                 });
                 this.chartsArr[row].setOption({
                     series: [
@@ -82,7 +193,7 @@
             }
             for (let i = 0; i < 5; i++) {
                 let currentTag = this.tagData.filter((e: tagDataLine) => {
-                    return Number(e.xAxis.split('index')[1])>=i*3000&&Number(e.xAxis.split('index')[1])<=i*3000+3000
+                    return Number(e.xAxis.split('index')[1]) >= i * 3000 && Number(e.xAxis.split('index')[1]) <= i * 3000 + 3000
                 });
                 this.chartsArr[i].setOption({
                     series: [
@@ -95,12 +206,116 @@
                 });
             }
         }
-        moveLine(event:any) {
+
+        drawMarkArea() {
+            let startRow=this.rowCompute(this.rhythmStart);
+            let endRow=this.rowCompute(this.rhythmEnd);
+            let startX=Number(this.rhythmStart.split('index')[1])-startRow*3000;
+            let endX=Number(this.rhythmEnd.split('index')[1])-endRow*3000;
+            if(startRow===endRow){
+                this.chartsArr[startRow].setOption({
+                    series: [
+                        {
+                            markArea: {
+                                data: [
+                                    [
+                                        {
+                                            name: '节律异常',
+                                            xAxis: startX,
+                                            yAxis: 'min'
+                                        },
+                                        {
+                                            xAxis: endX,
+                                            yAxis: 'max'
+                                        }
+                                    ]
+                                ]
+                            }
+                        }
+                    ]
+                });
+            }
+
+            for(let i=startRow;i<=endRow;i++){
+                if(i===startRow){
+                    this.chartsArr[i].setOption({
+                        series: [
+                            {
+                                markArea: {
+                                    data: [
+                                        [
+                                            {
+                                                name: '节律异常',
+                                                xAxis: startX,
+                                                yAxis: 'min'
+                                            },
+                                            {
+                                                xAxis: 3000,
+                                                yAxis: 'max'
+                                            }
+                                        ]
+                                    ]
+                                }
+                            }
+                        ]
+                    });
+                }else if(i===endRow){
+                    this.chartsArr[i].setOption({
+                        series: [
+                            {
+                                markArea: {
+                                    data: [
+                                        [
+                                            {
+                                                name: '节律异常',
+                                                xAxis: 0,
+                                                yAxis: 'min'
+                                            },
+                                            {
+                                                xAxis: endX,
+                                                yAxis: 'max'
+                                            }
+                                        ]
+                                    ]
+                                }
+                            }
+                        ]
+                    });
+                }else{
+                    this.chartsArr[i].setOption({
+                        series: [
+                            {
+                                markArea: {
+                                    data: [
+                                        [
+                                            {
+                                                name: '节律异常',
+                                                xAxis: 0,
+                                                yAxis: 'min'
+                                            },
+                                            {
+                                                xAxis: 3000,
+                                                yAxis: 'max'
+                                            }
+                                        ]
+                                    ]
+                                }
+                            }
+                        ]
+                    });
+                }
+            }
+
+        }
+        rowCompute(xAxis:string){
+            return Math.floor(Number(xAxis.split('index')[1])/3000);
+        }
+        moveLine(event: any) {
             this.startTime = new Date().getTime();
-            if(this.endTime-this.startTime<-32){//最快500ms执行一次，防止浏览器崩溃
-                let currentLineIndex=Number(this.currentUpdatexAxis.split('index')[1]);
+            if (this.endTime - this.startTime < -40) {//最快40ms执行一次，防止浏览器崩溃
+                let currentLineIndex = Number(this.currentUpdatexAxis.split('index')[1]);
                 if (event.keyCode === 39) {
-                    if (currentLineIndex < this.currentRow*3000+3000) {
+                    if (currentLineIndex < this.currentRow * 3000 + 3000) {
                         currentLineIndex++;
                         this.tagData = this.tagData.map(e => {
                             if (e.lineStyle) {
@@ -121,12 +336,12 @@
                                 }
                             }
                         });
-                        this.currentUpdatexAxis="index"+currentLineIndex;
+                        this.currentUpdatexAxis = "index" + currentLineIndex;
                         this.drawMarkLine(this.currentRow);
                     }
                 }
                 if (event.keyCode === 37) {
-                    if (currentLineIndex > this.currentRow*3000) {
+                    if (currentLineIndex > this.currentRow * 3000) {
                         currentLineIndex--;
                         this.tagData = this.tagData.map(e => {
                             if (e.lineStyle) {
@@ -147,29 +362,20 @@
                                 }
                             }
                         });
-                        this.currentUpdatexAxis="index"+currentLineIndex;
+                        this.currentUpdatexAxis = "index" + currentLineIndex;
                         this.drawMarkLine(this.currentRow);
                     }
                 }
-                if(event.keyCode===13){
-                    this.updateState=false;
-                    this.tagData=this.tagData.map(e=>{
-                        return {
-                            xAxis:e.xAxis,
-                            label: {
-                                formatter: e.label.formatter
-                            }
-                        }
-                    });
-                    this.drawMarkLine(this.currentRow);
-                    this.currentUpdatexAxis="";
+                if (event.keyCode === 13) {
+                    this.resetStatus(this.currentRow);
                 }
-                this.endTime=new Date().getTime();
-            }else{
+                this.endTime = new Date().getTime();
+            } else {
                 event.preventDefault();
             }
 
         }
+
         drawEcg(row: number, ele: any) {
             //下面定义的变量都是代表其中某一行心电
             let xData: Array<string> = [];//x轴
@@ -185,7 +391,6 @@
                 return {
                     xAxis: "index" + e.position,
                     label: {
-                        position: "start",
                         formatter: e.type
                     }
                 }
@@ -196,12 +401,13 @@
                 },
                 tooltip: {
                     trigger: 'axis',
-                    formatter: function (param: any) {
-                        /* addTagIndex=param[0].axisValue;
-                         document.getElementById("tagIndexInput").value=param[0].axisValue;*/
+                    formatter: (param: any) => {
+                        this.addTagIndex = param[0].axisValue;
+                        return this.addTagIndex
                     },
                     triggerOn: 'click'
                 },
+                animation: false,
                 xAxis: {
                     type: 'category',
                     boundaryGap: false,
@@ -228,21 +434,21 @@
                         markLine: {
                             data: tagData
                         },
-                        markArea: {
+                       /* markArea: {
                             data: [
                                 [
                                     {
                                         name: '节律异常',
-                                        xAxis: 1,
+                                        xAxis: 1000,
                                         yAxis: 'min'
                                     },
                                     {
-                                        xAxis: 4,
+                                        xAxis: 2000,
                                         yAxis: 'max'
                                     }
                                 ]
                             ]
-                        }
+                        }*/
                     }
                 ]
             };
@@ -251,13 +457,68 @@
                 if (params.componentType !== "markLine") {
                     return
                 }
-                //如果两次点击同一根线，或者重新点击开启修改，则修改编辑状态
-                if(this.currentUpdatexAxis===''||this.currentUpdatexAxis===params.value){
+                this.currentRow = row;
+                //添加节律
+                if (this.rhythmStartState) {
+                    this.rhythmStart = params.value;
+                    this.tagData = this.tagData.map((e: tagDataLine) => {
+                        if (e.xAxis === params.value) {
+                            return {
+                                xAxis: e.xAxis, lineStyle: {
+                                    color: "#2E34FF"
+                                },
+                                label: {
+                                    formatter: e.label.formatter
+                                }
+                            }
+                        } else {
+                            return {
+                                xAxis: e.xAxis,
+                                label: {
+                                    formatter: e.label.formatter
+                                }
+                            }
+                        }
+                    });
+                    this.drawMarkLine();
+                    this.rhythmStartState = false;
+                    return
+                }
+                if (this.rhythmEndState) {
+                    this.rhythmEnd = params.value;
+                    this.tagData = this.tagData.map((e: tagDataLine) => {
+                        if (e.xAxis === params.value ||e.xAxis===this.rhythmStart) {
+                            return {
+                                xAxis: e.xAxis, lineStyle: {
+                                    color: "#2E34FF"
+                                },
+                                label: {
+                                    formatter: e.label.formatter
+                                }
+                            }
+                        } else {
+                            return {
+                                xAxis: e.xAxis,
+                                label: {
+                                    formatter: e.label.formatter
+                                }
+                            }
+                        }
+                    });
+                    this.drawMarkLine();
+                    this.drawMarkArea();
+                    this.rhythmEndState = false;
+                    this.resetStatus();
+                    return
+                }
+
+                //下面是节拍编辑
+                //如果两次点击同一根线，或者重新点击开启修改，则修改状态
+                if (this.currentUpdatexAxis === '' || this.currentUpdatexAxis === params.value) {
                     this.updateState = !this.updateState;
                 }
-                this.currentUpdatexAxis=params.value;
+                this.currentUpdatexAxis = params.value;
                 if (this.updateState) {
-                    this.currentRow=row;
                     this.tagData = this.tagData.map((e: tagDataLine) => {
                         if (e.xAxis === params.value) {
                             return {
@@ -279,7 +540,7 @@
                     });
                     this.drawMarkLine();
                     document.addEventListener("keydown", this.moveLine);
-                }else{
+                } else {
                     this.tagData = this.tagData.map(e => {
                         return {
                             xAxis: e.xAxis,
@@ -289,7 +550,7 @@
                         }
                     });
                     this.drawMarkLine();
-                    this.currentUpdatexAxis='';
+                    this.currentUpdatexAxis = '';
                     document.removeEventListener("keydown", this.moveLine);
                 }
             })
@@ -300,7 +561,6 @@
                 return {
                     xAxis: "index" + e.position,
                     label: {
-                        position: "start",
                         formatter: e.type
                     }
                 }
@@ -323,6 +583,10 @@
         box-sizing: border-box;
         width: 1283px;
         margin: 0 auto;
+    }
+
+    .rythemTitle {
+        font-size: 14px;
     }
 
     .bg-left {

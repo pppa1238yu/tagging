@@ -182,16 +182,6 @@
                            </div>`;
             obj.append(addDiv);
 
-//            $('.shadow').on('mousemove', (e: any) => {
-//                let outerX = $('.outer_box').offset().left;
-//                let x = e.clientX - outerX - 20.5;
-//                let index = $(e.target).parent().parent().index();
-//                let suddenlyIndex = this.tagIndex + 1;
-//                this.curIndex = this.tagIndex;
-//                if (this.overLineState === false && x > 1) {
-//                    $('.tagPointer[data-index=' + this.curIndex + ']').css({left: x});
-//                }
-//            });
             if (!this.addLineState) {
                 this.tagIndex++;
             }
@@ -219,6 +209,11 @@
                     this.tagData[bindTagDataIndex].bindIndex = -1;
                     $('.tagPointer[data-index=' + bindIndex + ']').children('.shadow').css({width: 0});
                     for (let i = starttIndex + 1; i < enddIndex; i++) {
+                        this.crossBlock.map( (item,index) => {
+                           if(i === item){
+                               this.crossBlock.splice(index,1);
+                           }
+                        });
                         $('.bg_box').eq(i).children('.bg_shadow').css({
                             width: 0
                         });
@@ -231,7 +226,7 @@
             }
         }
 
-        private clickBind(suddenlyIndex) {
+        private clickBind(suddenlyIndex: number) {
             $('.tagPointer').bind('click', (e: any) => {
                 this.initState();
                 let index = $(e.target).parent().index();
@@ -249,6 +244,7 @@
                 this.addClickFunc();
             });
         }
+
 //        添加标注线
         private addLineFunc() {
             this.selectState = false;
@@ -332,12 +328,12 @@
                         this.tagData[dataIndex].position = Math.floor(1 / this.boxWidth * this.baseNum + this.baseNum * blockIndex);
                     }
                 } else if (blockIndex < 5) {
-                    if (leftNum <= 1) {
+                    if (leftNum <= 0.33) {
                         let obj = $('.tagPointer[data-index=' + this.curIndex + ']');
                         blockIndex--;
                         $('.bg_box').eq(blockIndex).append(obj);
                         leftNum = this.boxWidth - 1;
-                        this.tagData[dataIndex].position = Math.floor((leftNum - 1) / this.boxWidth * this.baseNum + this.baseNum * blockIndex);
+                        this.tagData[dataIndex].position = Math.floor((leftNum - 0.33) / this.boxWidth * this.baseNum + this.baseNum * blockIndex);
                     } else if (leftNum >= this.boxWidth - 1) {
                         let obj = $('.tagPointer[data-index=' + this.curIndex + ']');
                         blockIndex++;
@@ -360,6 +356,9 @@
                 }
 
                 if (keyCode === 39) {
+                    if(leftNum > 998){
+                        leftNum = 998;
+                    }
                     obj.css({
                         left: leftNum + 1 + 'px'
                     });
@@ -368,6 +367,9 @@
                     }
                     this.tagData[dataIndex].position = Math.floor((leftNum + 1) / this.boxWidth * this.baseNum + this.baseNum * blockIndex);
                 } else if (keyCode === 37) {
+                    if(leftNum < 1){
+                        leftNum = 1;
+                    }
                     obj.css({
                         left: leftNum - 1 + 'px'
                     });
